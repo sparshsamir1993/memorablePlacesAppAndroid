@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -42,9 +43,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     LocationManager locationManager;
     LocationListener locationListener;
-    JSONArray poiArray = new JSONArray();
-    String r;
+    JSONArray poiArray;
     Boolean isCurrentMarkerPresent = false;
+    JSONArray intentData;
+    Boolean isShowingPLace;
 
 
     @Override
@@ -59,8 +61,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void addCurrentPositionMarker(LatLng loc){
-        Log.i("Position is --- ", loc.toString());
-//        LatLng position = new LatLng(-34, 151);
+//        Log.i("Position is --- ", loc.toString());
         if(!isCurrentMarkerPresent){
             mMap.addMarker(new MarkerOptions().position(loc).title("Current Position").icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
             mMap.moveCamera(CameraUpdateFactory.newLatLng(loc));
@@ -71,52 +72,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_maps);
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
-
-        locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
-//        poiArray = new JSONArray();
-        locationListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-//                Log.i("xxxxxxx", location.toString());
-                positionChangeEvent(location);
-            }
-
-            @Override
-            public void onStatusChanged(String provider, int status, Bundle extras) {
-
-            }
-
-            @Override
-            public void onProviderEnabled(String provider) {
-
-            }
-
-            @Override
-            public void onProviderDisabled(String provider) {
-
-            }
-        };
-
-        if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION}, 1);
-        }else{
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,0, 0,locationListener);
-        }
-    }
-
     public void positionChangeEvent(Location location){
-        Log.i("xxxxxxx", location.toString());
         addCurrentPositionMarker(new LatLng(location.getLatitude(), location.getLongitude()));
-
-
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -144,7 +101,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     poiString = "Address Unavailable";
                 }
                 addressDetail.put("name", poiString);
-                addressDetail.put("position", new LatLng(address.getLatitude(), address.getLongitude()));
+                addressDetail.put("latitude", address.getLatitude());
+                addressDetail.put("longitude", address.getLongitude());
                 poiArray.put(addressDetail);
 
                 Intent i = new Intent();
@@ -167,13 +125,83 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
 
 
-        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
-            @RequiresApi(api = Build.VERSION_CODES.O)
-            @Override
-            public void onMapLongClick(LatLng latLng) {
-                addPlaceOfInterest(latLng);
+
+        Intent data = getIntent();
+        long id =  data.getLongExtra("placeId",-1);
+
+        Log.i("id is ----- ", String.valueOf(id));
+
+
+
+        try{
+            String jsonString = data.getStringExtra("storedPlaces");
+            poiArray = new JSONArray(jsonString);
+            Log.i("arr is ----- ", poiArray.toString());
+            if(id != -1){
+                isShowingPLace = true;
+
+                JSONObject obj = poiArray.getJSONObject((int)id);
+                LatLng pos = new LatLng(obj.getDouble("latitude"),obj.getDouble("longitude"));
+                mMap.addMarker((new MarkerOptions().position(pos).title(obj.getString("name")).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))));
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(pos));
             }
-        });
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+
+        if(!isShowingPLace){
+            mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+                @RequiresApi(api = Build.VERSION_CODES.O)
+                @Override
+                public void onMapLongClick(LatLng latLng) {
+                    addPlaceOfInterest(latLng);
+                }
+            });
+        }
 
     }
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        isShowingPLace = false;
+        setContentView(R.layout.activity_maps);
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+        mapFragment.getMapAsync(this);
+
+        isCurrentMarkerPresent = false;
+        intentData = new JSONArray();
+        poiArray= new JSONArray();
+        locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                positionChangeEvent(location);
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+
+            }
+        };
+
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION}, 1);
+        }else{
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,0, 0,locationListener);
+        }
+    }
+
+
 }

@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -20,9 +21,13 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
     ArrayList<String> poiList;
     ListView poiListV;
+    JSONArray jsonArr;
 
     public void addPlaceClick(View view){
         Intent toMapScreen = new Intent(getApplicationContext(), MapsActivity.class);
+        if(jsonArr != null && jsonArr.length() > 0){
+            toMapScreen.putExtra("storedPlaces", jsonArr.toString());
+        }
         startActivityForResult(toMapScreen, 1);
     }
 
@@ -30,14 +35,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-//        Log.i("I am Back !! --- ", data.getStringArrayListExtra("poiList").toString());
+
         if(requestCode ==1){
             if(resultCode == RESULT_OK){
+                poiList = new ArrayList<String>();
 
                String j =  data.getStringExtra("poiList");
                Log.i("String is  --- ", j);
                try{
-                   JSONArray jsonArr = new JSONArray(j);
+                   jsonArr = new JSONArray(j);
                    for(int i = 0 ; i< jsonArr.length(); i++){
 
                        JSONObject json = jsonArr.getJSONObject(i);
@@ -68,6 +74,16 @@ public class MainActivity extends AppCompatActivity {
 
         ArrayAdapter<String> poiAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, poiList);
         poiListV.setAdapter(poiAdapter);
+
+        poiListV.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Intent showPlaceI = new Intent(getApplicationContext(), MapsActivity.class);
+                showPlaceI.putExtra("placeId", id);
+                showPlaceI.putExtra("storedPlaces", jsonArr.toString());
+                startActivityForResult(showPlaceI, 1);
+            }
+        });
 
 
     }
